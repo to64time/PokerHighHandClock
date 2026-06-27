@@ -73,8 +73,9 @@
     51%, 100% { color: #5e0b0b; text-shadow: none; }
   }
 
-  .cards { flex: 1; display: flex; align-items: center; justify-content: center; gap: clamp(7px, 1.4vw, 24px); padding: clamp(6px, 1.6vh, 20px) 0 clamp(34px, 5vh, 58px); }
-  .card { position: relative; flex: 1 1 0; max-width: clamp(112px, 17.4vw, 402px); aspect-ratio: 1 / 1.42; align-self: center; border-radius: clamp(10px, 1.3vw, 22px); }
+  .cards { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: clamp(7px, 1.4vw, 24px); padding: clamp(6px, 1.6vh, 20px) clamp(10px, 2.2vw, 34px) clamp(58px, 9vh, 96px); }
+  /* width is computed by fitCards() so 5 cards fit both the width AND height of the screen */
+  .card { position: relative; flex: 0 0 auto; width: var(--card-w, 17vw); aspect-ratio: 1 / 1.42; align-self: center; border-radius: clamp(10px, 1.3vw, 22px); }
   .card-face {
     position: absolute; inset: 0; border-radius: inherit;
     background: linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
@@ -430,6 +431,21 @@ function renderCards() {
   else for (let i = 0; i < 5; i++) html += cardBack();
   el('cardRow').innerHTML = html;
 }
+// size the 5 cards to fit BOTH the available width and height, keeping their aspect ratio
+function fitCards() {
+  const wrap = el('cardRow');
+  if (!wrap) return;
+  const cs = getComputedStyle(wrap);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  const gap = parseFloat(cs.columnGap) || 0;
+  const availW = Math.max(0, wrap.clientWidth - padX);
+  const availH = Math.max(0, wrap.clientHeight - padY);
+  const byW = (availW - gap * 4) / 5;   // width cap from horizontal space (5 cards + 4 gaps)
+  const byH = availH / 1.42;            // width cap from vertical space (card height = width * 1.42)
+  const w = Math.max(60, Math.min(byW, byH, 440));
+  wrap.style.setProperty('--card-w', w + 'px');
+}
 
 function renderDisplay() {
   el('bannerPrize').textContent = state.settings.prize;
@@ -447,6 +463,7 @@ function renderDisplay() {
   el('winnerFlash').classList.toggle('hidden', !(award && state.currentHand));
 
   renderCards();
+  fitCards();
 }
 
 /* ---------- the clock engine ---------- */
@@ -615,6 +632,11 @@ el('display').addEventListener('pointerdown', () => { const c = el('controls'); 
 
 // first gesture primes audio
 document.addEventListener('pointerdown', function prime() { initAudio(); document.removeEventListener('pointerdown', prime); }, { once: true });
+
+// keep the cards fitting the screen on any resize / rotate / fullscreen change
+window.addEventListener('resize', fitCards);
+window.addEventListener('orientationchange', fitCards);
+document.addEventListener('fullscreenchange', fitCards);
 
 // boot
 lastBoundary = boundaries(Date.now()).prevTs;   // don't fire for an already-passed edge on load
