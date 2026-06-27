@@ -49,6 +49,7 @@
   /* ============ CLOCK (TV) VIEW ============ */
   #display { height: 100%; display: flex; flex-direction: column; padding: clamp(14px, 3vh, 34px); }
   .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .left { min-width: 0; }   /* let the logo/banner column shrink so the clock never overlaps it on narrow screens */
   /* In browser fullscreen, iOS overlays its own exit-X in the top-left corner.
      Only then, nudge the header right so the Fortune logo isn't covered by it. */
   :fullscreen .top,
@@ -76,8 +77,14 @@
     0%, 50%   { color: #ff3030; text-shadow: 0 0 26px rgba(255,48,48,0.9), 0 0 70px rgba(255,48,48,0.45); }
     51%, 100% { color: #5e0b0b; text-shadow: none; }
   }
+  /* phones / very narrow split-view (off the main iPad/TV target): stack the header so the clock never overlaps the logo */
+  @media (max-width: 480px) {
+    .top { flex-direction: column; align-items: flex-start; gap: 4px; }
+    .logo { height: clamp(46px, 9vh, 84px); }
+    .clock { font-size: clamp(56px, 20vw, 120px); line-height: 1; }
+  }
 
-  .cards { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; gap: clamp(7px, 1.4vw, 24px); padding: clamp(6px, 1.6vh, 20px) clamp(10px, 2.2vw, 34px) clamp(58px, 9vh, 96px); }
+  .cards { flex: 1; min-height: 0; min-width: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: clamp(7px, 1.4vw, 24px); padding: clamp(6px, 1.6vh, 20px) clamp(16px, 2.2vw, 34px) clamp(58px, 9vh, 96px); }
   /* width is computed by fitCards() so 5 cards fit both the width AND height of the screen */
   .card { position: relative; flex: 0 0 auto; width: var(--card-w, 17vw); aspect-ratio: 1 / 1.42; align-self: center; border-radius: clamp(10px, 1.3vw, 22px); }
   .card-face {
@@ -453,7 +460,12 @@ function fitCards() {
   const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
   const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
   const gap = parseFloat(cs.columnGap) || 0;
-  const availW = Math.max(0, wrap.clientWidth - padX);
+  // measure width from the layout VIEWPORT (stable), minus the #display + .cards horizontal padding.
+  // Using wrap.clientWidth feeds back on itself when cards overflow, locking in an oversized card.
+  const parent = wrap.parentElement;
+  let parentPadX = 0;
+  if (parent) { const pcs = getComputedStyle(parent); parentPadX = parseFloat(pcs.paddingLeft) + parseFloat(pcs.paddingRight); }
+  const availW = Math.max(0, (window.innerWidth || document.documentElement.clientWidth) - parentPadX - padX);
   const availH = Math.max(0, wrap.clientHeight - padY);
   const byW = (availW - gap * 4) / 5;   // width cap from horizontal space (5 cards + 4 gaps)
   const byH = availH / 1.42;            // width cap from vertical space (card height = width * 1.42)
@@ -608,8 +620,14 @@ function saveSettings() {
   state.settings.intervalMin = Math.max(1, Math.min(60, parseInt(el('setInterval').value) || 30));
   state.settings.tables = Math.max(1, Math.min(40, parseInt(el('setTables').value) || 15));
   state.settings.soundOn = el('setSound').classList.contains('on');
+  let msg = 'Settings saved';
+  // don't strand a live hand: keep enough tables that its table stays reachable in the picker
+  if (state.currentHand && state.currentHand.table > state.settings.tables) {
+    state.settings.tables = state.currentHand.table;
+    msg = 'Kept ' + state.settings.tables + ' tables — Table ' + state.currentHand.table + ' has a live hand';
+  }
   if (state.settings.intervalMin !== oldInterval) lastBoundary = boundaries(Date.now()).prevTs;   // realign only when the period length actually changed (don't clobber a just-passed edge)
-  save(); closeOverlays(); renderDisplay(); toast('Settings saved');
+  save(); closeOverlays(); renderDisplay(); toast(msg);
 }
 
 /* ---------- wake lock (keep tablet awake) ---------- */
