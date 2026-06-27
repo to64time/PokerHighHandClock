@@ -638,6 +638,12 @@ window.addEventListener('resize', fitCards);
 window.addEventListener('orientationchange', fitCards);
 document.addEventListener('fullscreenchange', fitCards);
 
+// Launched from the Home Screen (iOS standalone)? It's already fullscreen with no
+// browser chrome or exit-X, so the in-app fullscreen button is redundant — hide it.
+if (window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)) {
+  const fs = el('btnFs'); if (fs) fs.style.display = 'none';
+}
+
 // boot
 lastBoundary = boundaries(Date.now()).prevTs;   // don't fire for an already-passed edge on load
 // optional preview (does not persist): add ?demo to the URL to show a sample hand
