@@ -1,6 +1,12 @@
-# Fortune Casinos — High Hand Clock
+# Fortune Casino — High Hand Clock
 
 In-room High Hand promotion display + operator control. One tablet runs everything and **mirrors to the TV** (AirPlay / Chromecast / HDMI). No accounts, no server, no build step — a single `index.html`, just like the tournament clock.
+
+## 🟢 Live site
+
+**https://to64time.github.io/PokerHighHandClock/**
+
+Hosted free on GitHub Pages — **auto-deploys on every push to `main`**. Open it on the tablet, Add to Home Screen for a chromeless launcher, then mirror to the TV.
 
 ## How it works
 
