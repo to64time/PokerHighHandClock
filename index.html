@@ -49,6 +49,10 @@
   /* ============ CLOCK (TV) VIEW ============ */
   #display { height: 100%; display: flex; flex-direction: column; padding: clamp(14px, 3vh, 34px); }
   .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  /* In browser fullscreen, iOS overlays its own exit-X in the top-left corner.
+     Only then, nudge the header right so the Fortune logo isn't covered by it. */
+  :fullscreen .top,
+  :-webkit-full-screen .top { padding-left: clamp(56px, 6.5vw, 100px); }
   .logo { display: block; height: clamp(74px, 13vh, 172px); width: auto; filter: drop-shadow(0 0 16px rgba(212,164,55,0.4)); }
 
   .banner { margin-top: clamp(8px, 1.6vh, 16px); }
