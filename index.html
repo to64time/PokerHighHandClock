@@ -313,6 +313,11 @@ let state = load();
 let award = null;               // transient: { startAt } during the 10s winner hold
 let lastBoundary = null;        // ms timestamp of the most recently handled :00/:30 edge
 
+// a hand is valid only if it is exactly 5 well-formed card codes (guards against corrupt storage)
+function validHand(h) {
+  return !!(h && Array.isArray(h.cards) && h.cards.length === 5 &&
+    h.cards.every(c => typeof c === 'string' && RANKS.indexOf(c.slice(0, -1)) >= 0 && SUIT_MAP[c.slice(-1)]));
+}
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -320,28 +325,31 @@ function load() {
       const s = JSON.parse(raw);
       return {
         settings: Object.assign({}, DEFAULTS.settings, s.settings),
-        currentHand: s.currentHand || null,
-        history: Array.isArray(s.history) ? s.history : []
+        currentHand: validHand(s.currentHand) ? s.currentHand : null,
+        history: (Array.isArray(s.history) ? s.history : []).filter(h => h && Array.isArray(h.cards) && h.cards.every(c => typeof c === 'string' && SUIT_MAP[c.slice(-1)]))
       };
     }
   } catch (e) {}
   return JSON.parse(JSON.stringify(DEFAULTS));
 }
+const IS_DEMO = location.search.indexOf('demo') >= 0;   // ?demo preview: must never touch real storage
 function save() {
+  if (IS_DEMO) return;
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
 }
 const intervalMs = () => state.settings.intervalMin * 60000;
 
 /* ---------- wall-clock periods ----------
-   The countdown is derived from the real time of day and aligned to the hour,
-   so a 30-minute period always lands on :00 and :30. */
+   The countdown is derived from the real time of day. The grid is anchored to local
+   midnight so every interval is uniform: 30 still lands on :00/:30, and non-divisors
+   like 40/45 stay regular instead of cutting a short stub period at the top of each hour. */
 function boundaries(now) {
   const d = new Date(now);
-  const hourStart = now - ((d.getMinutes() * 60 + d.getSeconds()) * 1000 + d.getMilliseconds());
+  const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const step = intervalMs();
-  const msSinceHour = now - hourStart;
-  const prevTs = hourStart + Math.floor(msSinceHour / step) * step; // edge at/just before now
-  const nextTs = prevTs + step;                                     // next award time
+  const msSinceDay = now - dayStart;
+  const prevTs = dayStart + Math.floor(msSinceDay / step) * step; // edge at/just before now
+  const nextTs = prevTs + step;                                   // next award time
   return { prevTs, nextTs, remaining: nextTs - now };
 }
 
@@ -415,13 +423,13 @@ function closeOverlays() { Object.values(views).forEach(v => v.classList.add('hi
 /* ---------- clock display ---------- */
 function fmtClock(ms) {
   if (ms < 0) ms = 0;
-  const total = Math.round(ms / 1000);
+  const total = Math.ceil(ms / 1000);   // ceil so the clock reads 0:00 only at/after zero, not ~0.5s early
   const m = Math.floor(total / 60), s = total % 60;
   return m + ':' + String(s).padStart(2, '0');
 }
 
 function cardFace(code) {
-  const rank = code.slice(0, -1), suit = SUIT_MAP[code.slice(-1)];
+  const rank = code.slice(0, -1), suit = SUIT_MAP[code.slice(-1)] || { red: false, sym: '?' };
   return '<div class="card"><div class="card-face ' + (suit.red ? 'red' : '') + '">'
     + '<div class="rank">' + rank + '</div><div class="suit">' + suit.sym + '</div></div></div>';
 }
@@ -474,30 +482,34 @@ function renderDisplay() {
 
 /* ---------- the clock engine ---------- */
 function tick() {
-  const now = Date.now();
-  if (award) {
-    if (now - award.startAt >= HOLD_MS) endAward();
-    renderDisplay();
-    return;
-  }
-  const b = boundaries(now);
-  if (b.prevTs !== lastBoundary) {   // a :00/:30 edge passed
-    lastBoundary = b.prevTs;
-    if (now - b.prevTs <= LATE_GRACE_MS) {
-      onWindowEnd();                 // the edge genuinely just happened → buzzer + winner hold / chime
-    } else {
-      // the tab was asleep (screen off / backgrounded) across the edge — finalize
-      // silently so we don't beep ~30s late into the new period
-      if (state.currentHand) {
-        state.history.unshift({ table: state.currentHand.table, cards: state.currentHand.cards.slice(), wonAt: b.prevTs });
-        if (state.history.length > 200) state.history.length = 200;
-        state.currentHand = null;
-      }
-      award = null;
-      save();
+  try {
+    const now = Date.now();
+    // re-acquire the wake lock if the OS released it while we're still visible (keeps the TV awake)
+    if (!wakeLock && ('wakeLock' in navigator) && document.visibilityState === 'visible' && now - lastWakeTry > 15000) { lastWakeTry = now; requestWake(); }
+    if (award) {
+      if (now - award.startAt >= HOLD_MS) endAward();
+      renderDisplay();
+      return;
     }
-  }
-  renderDisplay();
+    const b = boundaries(now);
+    if (b.prevTs !== lastBoundary) {   // a :00/:30 edge passed
+      lastBoundary = b.prevTs;
+      if (now - b.prevTs <= LATE_GRACE_MS) {
+        onWindowEnd();                 // the edge genuinely just happened → buzzer + winner hold / chime
+      } else {
+        // the tab was asleep (screen off / backgrounded) across the edge — finalize
+        // silently so we don't beep ~30s late into the new period
+        if (state.currentHand) {
+          state.history.unshift({ table: state.currentHand.table, cards: state.currentHand.cards.slice(), wonAt: b.prevTs });
+          if (state.history.length > 200) state.history.length = 200;
+          state.currentHand = null;
+        }
+        award = null;
+        save();
+      }
+    }
+    renderDisplay();
+  } catch (e) { /* never let one bad frame kill the heartbeat */ }
 }
 function onWindowEnd() {
   if (state.currentHand) {
@@ -558,8 +570,10 @@ function refreshEntry() {
 function submitHand() {
   if (pick.table == null) { toast('Pick a table first'); return; }
   if (pick.cards.length !== 5) { toast('Select exactly 5 cards'); return; }
-  award = null;
-  state.currentHand = { table: pick.table, cards: pick.cards.slice() };
+  if (award) { toast('Winner is showing — try again in a moment'); return; }   // don't cut the 10s celebration short
+  const b = boundaries(Date.now());
+  state.currentHand = { table: pick.table, cards: pick.cards.slice(), winsAt: b.nextTs };  // this hand wins at the next edge
+  lastBoundary = b.prevTs;   // a hand entered right at the buzzer can't be retro-awarded to the edge that just passed
   save(); closeOverlays(); renderDisplay();
   toast('High hand updated — Table ' + state.currentHand.table);
 }
@@ -588,19 +602,26 @@ function buildSettings() {
   ).join('');
 }
 function saveSettings() {
+  const oldInterval = state.settings.intervalMin;
   state.settings.prize = el('setPrize').value.trim() || DEFAULTS.settings.prize;
   state.settings.note = el('setNote').value.trim();
   state.settings.intervalMin = Math.max(1, Math.min(60, parseInt(el('setInterval').value) || 30));
   state.settings.tables = Math.max(1, Math.min(40, parseInt(el('setTables').value) || 15));
   state.settings.soundOn = el('setSound').classList.contains('on');
-  lastBoundary = boundaries(Date.now()).prevTs;   // realign after an interval change
+  if (state.settings.intervalMin !== oldInterval) lastBoundary = boundaries(Date.now()).prevTs;   // realign only when the period length actually changed (don't clobber a just-passed edge)
   save(); closeOverlays(); renderDisplay(); toast('Settings saved');
 }
 
 /* ---------- wake lock (keep tablet awake) ---------- */
-let wakeLock = null;
-async function requestWake() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') requestWake(); });
+let wakeLock = null, lastWakeTry = 0;
+async function requestWake() {
+  try {
+    if (!('wakeLock' in navigator)) return;
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });   // OS released it -> let tick re-arm
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !wakeLock) requestWake(); });
 
 /* ---------- toast ---------- */
 let toastT;
@@ -608,8 +629,14 @@ function toast(msg) { const t = el('toast'); t.textContent = msg; t.classList.ad
 
 /* ---------- fullscreen ---------- */
 function toggleFs() {
-  if (!document.fullscreenElement) { (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen).call(document.documentElement); }
-  else { (document.exitFullscreen || document.webkitExitFullscreen).call(document); }
+  const docEl = document.documentElement;
+  const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+  const exit = document.exitFullscreen || document.webkitExitFullscreen;
+  const inFs = document.fullscreenElement || document.webkitFullscreenElement;   // webkit-only engines (older iPad Safari)
+  try {
+    if (!inFs) { if (req) Promise.resolve(req.call(docEl)).catch(() => {}); }
+    else if (exit) Promise.resolve(exit.call(document)).catch(() => {});
+  } catch (e) {}
 }
 
 /* ---------- wire up ---------- */
@@ -634,7 +661,7 @@ el('cardGrid').onclick = (e) => {
 el('histClose').onclick = closeOverlays;
 el('histClear').onclick = () => { if (confirm('Clear the entire high hand log?')) { state.history = []; save(); buildHistory(); } };
 
-el('setClose').onclick = closeOverlays;
+el('setClose').onclick = saveSettings;   // closing the panel commits all fields (sound/cue already save live)
 el('setSound').onclick = () => { const on = !el('setSound').classList.contains('on'); el('setSound').classList.toggle('on', on); state.settings.soundOn = on; save(); };
 el('soundGrid').onclick = (e) => {
   const b = e.target.closest('.snd'); if (!b) return;
@@ -655,17 +682,34 @@ document.addEventListener('pointerdown', function prime() { initAudio(); documen
 window.addEventListener('resize', fitCards);
 window.addEventListener('orientationchange', fitCards);
 document.addEventListener('fullscreenchange', fitCards);
+document.addEventListener('webkitfullscreenchange', fitCards);   // older iPad Safari fires the prefixed event
 
-// Launched from the Home Screen (iOS standalone)? It's already fullscreen with no
-// browser chrome or exit-X, so the in-app fullscreen button is redundant — hide it.
-if (window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)) {
+// Hide the in-app fullscreen button when it's not useful: launched from the Home Screen
+// (already fullscreen, iOS adds no exit-X), or the browser has no element Fullscreen API.
+const _noFs = !(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+if (window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || _noFs) {
   const fs = el('btnFs'); if (fs) fs.style.display = 'none';
 }
 
 // boot
-lastBoundary = boundaries(Date.now()).prevTs;   // don't fire for an already-passed edge on load
-// optional preview (does not persist): add ?demo to the URL to show a sample hand
-if (location.search.indexOf('demo') >= 0 && !state.currentHand) state.currentHand = { table: 13, cards: ['4s','4h','4d','Kd','Kc'] };
+(function reconcileOnBoot() {
+  const b = boundaries(Date.now());
+  if (state.currentHand) {
+    if (state.currentHand.winsAt == null) {
+      state.currentHand.winsAt = b.nextTs;            // legacy hand with no stamp: treat as the current period
+    } else if (Date.now() >= state.currentHand.winsAt) {
+      // this hand won at an earlier edge while the tablet was asleep or the page was closed —
+      // log it now at its real boundary instead of letting it linger, mis-log, or be cleared away
+      state.history.unshift({ table: state.currentHand.table, cards: state.currentHand.cards.slice(), wonAt: state.currentHand.winsAt });
+      if (state.history.length > 200) state.history.length = 200;
+      state.currentHand = null;
+      save();
+    }
+  }
+  lastBoundary = b.prevTs;   // don't re-fire for an already-passed edge on load
+})();
+// optional preview (?demo) — in memory only; save() is a no-op in demo so it never persists
+if (IS_DEMO && !state.currentHand) state.currentHand = { table: 13, cards: ['4s', '4h', '4d', 'Kd', 'Kc'], winsAt: boundaries(Date.now()).nextTs };
 requestWake();
 renderDisplay();
 setInterval(tick, 250);
