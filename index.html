@@ -54,6 +54,8 @@
   .banner { margin-top: clamp(8px, 1.6vh, 16px); }
   .banner .prize { font-size: clamp(16px, 2.6vw, 32px); font-weight: 700; color: var(--silver); letter-spacing: 1px; text-shadow: 0 0 14px rgba(41,227,255,0.25); }
   .banner .freq { font-size: clamp(12px, 1.7vw, 20px); font-weight: 500; color: var(--muted); letter-spacing: 1px; margin-top: 2px; }
+  .banner .note { font-size: clamp(12px, 1.7vw, 20px); font-weight: 500; color: var(--muted); letter-spacing: 1px; margin-top: 2px; }
+  .banner .note:empty { display: none; }
   .banner .tableTag { display: inline-block; margin-top: 6px; font-size: clamp(15px, 2.2vw, 28px); font-weight: 800; color: var(--cyan-bright); letter-spacing: 2px; text-shadow: 0 0 16px var(--cyan-glow); }
   .banner .tableTag.empty { display: none; }
 
@@ -209,6 +211,7 @@
       <div class="banner">
         <div class="prize" id="bannerPrize">$100 – $250 HIGH HAND</div>
         <div class="freq" id="bannerFreq">Every 30 Minutes</div>
+        <div class="note" id="bannerNote">Daily 11AM – 7PM</div>
         <div class="tableTag empty" id="bannerTable">[—]</div>
       </div>
     </div>
@@ -266,6 +269,7 @@
     <button class="btn ghost" id="setClose">✕</button>
   </div>
   <div class="set-row"><label>Prize text</label><input type="text" id="setPrize" maxlength="40"></div>
+  <div class="set-row"><label>Custom line<span class="hint">Under the schedule — e.g. your hours. Leave blank to hide.</span></label><input type="text" id="setNote" maxlength="60" placeholder="Daily 11AM – 7PM"></div>
   <div class="set-row"><label>Period length<span class="hint">Aligned to the clock — 30 = top &amp; bottom of the hour</span></label><input type="number" id="setInterval" min="1" max="60"></div>
   <div class="set-row"><label>Number of tables</label><input type="number" id="setTables" min="1" max="40"></div>
   <div class="set-row"><label>Sound / alarm</label><div class="toggle" id="setSound"></div></div>
@@ -294,7 +298,7 @@ const HOLD_MS = 10000;          // winner stays up 10s after the buzzer, then re
 const WARN_AT_MS = 10000;       // last 10s: clock flashes red
 
 const DEFAULTS = {
-  settings: { prize: '$100 – $250 HIGH HAND', intervalMin: 30, tables: 15, soundOn: true, soundId: 'jackpot' },
+  settings: { prize: '$100 – $250 HIGH HAND', intervalMin: 30, tables: 15, soundOn: true, soundId: 'jackpot', note: 'Daily 11AM – 7PM' },
   currentHand: null,            // { table:Number, cards:[code,...] }
   history: []                   // [{ table, cards, wonAt }]
 };
@@ -433,6 +437,7 @@ function renderCards() {
 function renderDisplay() {
   el('bannerPrize').textContent = state.settings.prize;
   el('bannerFreq').textContent = 'Every ' + state.settings.intervalMin + ' Minute' + (state.settings.intervalMin === 1 ? '' : 's');
+  el('bannerNote').textContent = state.settings.note || '';
 
   const tag = el('bannerTable');
   if (state.currentHand && state.currentHand.table != null) { tag.textContent = '[ Table ' + state.currentHand.table + ' ]'; tag.classList.remove('empty'); }
@@ -541,6 +546,7 @@ function buildHistory() {
 /* ---------- Settings view ---------- */
 function buildSettings() {
   el('setPrize').value = state.settings.prize;
+  el('setNote').value = state.settings.note;
   el('setInterval').value = state.settings.intervalMin;
   el('setTables').value = state.settings.tables;
   el('setSound').classList.toggle('on', state.settings.soundOn);
@@ -551,6 +557,7 @@ function buildSettings() {
 }
 function saveSettings() {
   state.settings.prize = el('setPrize').value.trim() || DEFAULTS.settings.prize;
+  state.settings.note = el('setNote').value.trim();
   state.settings.intervalMin = Math.max(1, Math.min(60, parseInt(el('setInterval').value) || 30));
   state.settings.tables = Math.max(1, Math.min(40, parseInt(el('setTables').value) || 15));
   state.settings.soundOn = el('setSound').classList.contains('on');
