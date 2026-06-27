@@ -1,43 +1,624 @@
 <!DOCTYPE html>
+<!-- Fortune Casinos — High Hand Clock | build: 2026-06-26 v2 (wall-clock linked) -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0a0f17">
-<title>Fortune Poker — High Hand Clock</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="High Hand">
+<meta name="theme-color" content="#06122a">
+<title>Fortune Casinos — High Hand Clock</title>
 <style>
   :root {
-    --bg: #0a0f17;
-    --cyan: #00d9ff;
-    --silver: #e6ecf5;
+    --bg-deep: #03060f;
+    --cyan: #29e3ff;
+    --cyan-bright: #8af4ff;
+    --cyan-glow: rgba(41,227,255,0.55);
+    --silver: #eaf3ff;
+    --muted: rgba(234,243,255,0.45);
     --gold: #d4a437;
-    --muted: rgba(230,236,245,0.45);
+    --red: #ff4d52;
+    --dark: #10131c;
+    --danger: #ff6b6b;
+    --ok: #43e07a;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; }
-  body {
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 18px; text-align: center; padding: 24px;
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
     color: var(--silver);
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, select { font-family: inherit; touch-action: manipulation; }
+  body {
     background:
-      radial-gradient(ellipse 70% 60% at 22% 28%, rgba(99,102,241,0.22) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 70% at 82% 72%, rgba(34,211,238,0.18) 0%, transparent 60%),
-      linear-gradient(135deg, #0a0e1c 0%, #0e1322 50%, #0c1020 100%);
+      radial-gradient(ellipse 60% 50% at 78% 22%, rgba(41,227,255,0.18) 0%, transparent 60%),
+      radial-gradient(ellipse 70% 60% at 18% 30%, rgba(46,103,255,0.20) 0%, transparent 62%),
+      radial-gradient(circle at 50% 120%, rgba(41,227,255,0.10) 0%, transparent 55%),
+      linear-gradient(160deg, #061029 0%, #04081a 55%, #02040d 100%);
+    background-attachment: fixed;
   }
-  h1 {
-    font-size: clamp(28px, 6vw, 56px);
-    font-weight: 600; letter-spacing: 4px; text-transform: uppercase;
+  .tnum { font-variant-numeric: tabular-nums; }
+  .hidden { display: none !important; }
+
+  /* ============ CLOCK (TV) VIEW ============ */
+  #display { height: 100%; display: flex; flex-direction: column; padding: clamp(14px, 3vh, 34px); }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .logo { display: block; height: clamp(74px, 13vh, 172px); width: auto; filter: drop-shadow(0 0 16px rgba(212,164,55,0.4)); }
+
+  .banner { margin-top: clamp(8px, 1.6vh, 16px); }
+  .banner .prize { font-size: clamp(16px, 2.6vw, 32px); font-weight: 700; color: var(--silver); letter-spacing: 1px; text-shadow: 0 0 14px rgba(41,227,255,0.25); }
+  .banner .freq { font-size: clamp(12px, 1.7vw, 20px); font-weight: 500; color: var(--muted); letter-spacing: 1px; margin-top: 2px; }
+  .banner .tableTag { display: inline-block; margin-top: 6px; font-size: clamp(15px, 2.2vw, 28px); font-weight: 800; color: var(--cyan-bright); letter-spacing: 2px; text-shadow: 0 0 16px var(--cyan-glow); }
+  .banner .tableTag.empty { display: none; }
+
+  .clock {
+    font-size: clamp(74px, 19.5vw, 264px);
+    font-weight: 800; line-height: 0.9;
+    color: var(--cyan-bright);
+    text-shadow: 0 0 18px var(--cyan-glow), 0 0 60px rgba(41,227,255,0.35);
+    letter-spacing: -2px; white-space: nowrap;
   }
-  h1 .gold { color: var(--gold); }
-  .tag { color: var(--cyan); letter-spacing: 3px; text-transform: uppercase; font-size: clamp(13px, 2.4vw, 18px); }
-  .note { color: var(--muted); max-width: 36ch; line-height: 1.5; }
+  /* last 30 seconds — flashing red for excitement */
+  .clock.warn { animation: warnFlash 0.56s steps(1, end) infinite; }
+  @keyframes warnFlash {
+    0%, 50%   { color: #ff3030; text-shadow: 0 0 26px rgba(255,48,48,0.9), 0 0 70px rgba(255,48,48,0.45); }
+    51%, 100% { color: #5e0b0b; text-shadow: none; }
+  }
+
+  .cards { flex: 1; display: flex; align-items: center; justify-content: center; gap: clamp(7px, 1.4vw, 24px); padding: clamp(6px, 1.6vh, 20px) 0 clamp(34px, 5vh, 58px); }
+  .card { position: relative; flex: 1 1 0; max-width: clamp(112px, 17.4vw, 402px); aspect-ratio: 1 / 1.42; align-self: center; border-radius: clamp(10px, 1.3vw, 22px); }
+  .card-face {
+    position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
+    border: 2px solid rgba(41,227,255,0.9);
+    box-shadow: 0 0 24px var(--cyan-glow), inset 0 0 28px rgba(41,227,255,0.12);
+    display: flex; flex-direction: column; padding: clamp(8px, 1.4vw, 26px);
+    color: var(--dark);
+  }
+  .card-face.red { color: var(--red); }
+  .card-face .rank { font-size: clamp(42px, 10vw, 162px); font-weight: 800; line-height: 0.76; letter-spacing: -2px; }
+  .card-face .suit { font-size: clamp(40px, 8.5vw, 132px); line-height: 0.9; margin-top: auto; align-self: center; }
+  .card-back {
+    position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(160deg, #0a3bb0 0%, #062a86 50%, #041d63 100%);
+    border: 2px solid rgba(41,227,255,0.95);
+    box-shadow: 0 0 20px var(--cyan-glow), inset 0 0 30px rgba(41,227,255,0.25);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card-back svg { width: 52%; height: auto; opacity: 0.92; filter: drop-shadow(0 0 6px rgba(41,227,255,0.8)); }
+
+  .winner-flash {
+    position: absolute; left: 0; right: 0; top: 36%;
+    text-align: center; pointer-events: none;
+    font-size: clamp(26px, 6vw, 90px); font-weight: 900; letter-spacing: 5px;
+    color: var(--gold); text-shadow: 0 0 24px rgba(212,164,55,0.85), 0 0 8px #fff;
+    animation: winFlash 0.7s ease-in-out infinite;
+  }
+  @keyframes winFlash { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(1.06); } }
+
+  /* ============ BOTTOM CONTROL BAR ============ */
+  .controls {
+    position: fixed; bottom: clamp(10px, 2vh, 22px); left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; align-items: center;
+    background: rgba(6,14,32,0.55); border: 1px solid rgba(41,227,255,0.18);
+    border-radius: 999px; padding: 6px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    opacity: 0.38; transition: opacity 180ms ease; z-index: 30;
+  }
+  .controls:hover, .controls:focus-within, .controls.show { opacity: 1; }
+  .ctl { background: transparent; color: var(--silver); border: none; border-radius: 999px; padding: 9px 14px; min-height: 42px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; cursor: pointer; display: flex; align-items: center; gap: 7px; transition: background 140ms ease; }
+  .ctl:active { background: rgba(255,255,255,0.16); }
+  .ctl .ic { font-size: 17px; }
+  .ctl.primary { background: var(--cyan); color: #02121f; }
+  .ctl.primary:active { background: var(--cyan-bright); }
+
+  /* ============ OVERLAYS (entry / history / settings) ============ */
+  .overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: linear-gradient(160deg, #061029 0%, #04081a 60%, #02040d 100%);
+    display: flex; flex-direction: column; padding: clamp(12px, 2.4vh, 26px);
+    overflow-y: auto;
+  }
+  .ov-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: clamp(10px, 2vh, 20px); flex-shrink: 0; }
+  .ov-title { font-size: clamp(18px, 3vw, 30px); font-weight: 800; letter-spacing: 1px; }
+  .ov-title small { display: block; font-size: clamp(11px, 1.5vw, 15px); font-weight: 500; color: var(--muted); letter-spacing: 1px; margin-top: 3px; }
+
+  .field-label { font-size: clamp(13px, 1.7vw, 17px); font-weight: 600; color: var(--cyan); letter-spacing: 1px; margin: clamp(8px,1.6vh,16px) 0 8px; text-transform: uppercase; }
+
+  /* table picker */
+  .tables { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tbl { min-width: 52px; padding: 12px 8px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.12); color: var(--silver); font-size: clamp(16px,2.2vw,22px); font-weight: 700; cursor: pointer; flex: 1 1 auto; max-width: 90px; }
+  .tbl.sel { background: var(--cyan); border-color: var(--cyan); color: #02121f; box-shadow: 0 0 16px var(--cyan-glow); }
+
+  /* card grid */
+  .grid { display: grid; grid-template-columns: repeat(13, 1fr); gap: clamp(3px, 0.6vw, 7px); }
+  .pcard {
+    aspect-ratio: 3 / 4; border-radius: 8px; cursor: pointer;
+    background: linear-gradient(180deg, #1a2236 0%, #131a2b 100%);
+    border: 1.5px solid rgba(255,255,255,0.10);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    color: var(--silver); position: relative; transition: transform 70ms ease;
+  }
+  .pcard .pr { font-size: clamp(13px, 2vw, 26px); font-weight: 800; line-height: 1; }
+  .pcard .ps { font-size: clamp(11px, 1.7vw, 22px); line-height: 1; }
+  .pcard.red { color: var(--red); }
+  .pcard.sel { background: var(--cyan); border-color: var(--cyan-bright); color: #02121f; box-shadow: 0 0 14px var(--cyan-glow); transform: translateY(-2px); }
+  .pcard.sel.red { color: #7a0008; }
+  .pcard.dim { opacity: 0.4; }
+
+  .sel-summary { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: clamp(10px,1.8vh,18px) 0; }
+  .sel-count { font-size: clamp(14px,1.9vw,19px); font-weight: 700; }
+  .sel-count.done { color: var(--ok); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { font-size: clamp(16px,2.2vw,24px); font-weight: 800; padding: 4px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); }
+  .chip.red { color: var(--red); }
+
+  .ov-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: auto; padding-top: clamp(12px,2vh,20px); flex-wrap: wrap; }
+  .btn { padding: 13px 26px; min-height: 50px; border-radius: 12px; font-size: clamp(14px,1.8vw,18px); font-weight: 700; letter-spacing: 0.5px; cursor: pointer; border: 1.5px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: var(--silver); }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary { background: var(--cyan); border-color: var(--cyan); color: #02121f; }
+  .btn.primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn.danger { color: var(--danger); border-color: rgba(255,107,107,0.4); }
+  .btn.ghost { background: transparent; }
+
+  /* history */
+  .hist-list { display: flex; flex-direction: column; gap: 8px; }
+  .hist-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+  .hist-when { font-size: clamp(12px,1.5vw,15px); color: var(--muted); min-width: 92px; }
+  .hist-table { font-size: clamp(13px,1.7vw,17px); font-weight: 800; color: var(--cyan-bright); min-width: 70px; }
+  .hist-cards { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mini { font-size: clamp(15px,2vw,22px); font-weight: 800; }
+  .mini.red { color: var(--red); }
+  .hist-empty { color: var(--muted); text-align: center; padding: 40px; font-size: 16px; }
+
+  /* settings */
+  .set-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .set-row label { font-size: clamp(14px,1.8vw,18px); font-weight: 600; }
+  .set-row .hint { font-size: 12px; color: var(--muted); font-weight: 400; display: block; margin-top: 3px; }
+  .set-row input[type=text], .set-row input[type=number] { background: rgba(255,255,255,0.06); border: 1.5px solid rgba(255,255,255,0.15); border-radius: 10px; color: var(--silver); padding: 10px 12px; font-size: 16px; width: 160px; text-align: right; }
+  .set-row input[type=number] { width: 90px; }
+  .toggle { width: 58px; height: 32px; border-radius: 999px; background: rgba(255,255,255,0.15); position: relative; cursor: pointer; transition: background 160ms; flex-shrink: 0; }
+  .toggle.on { background: var(--cyan); }
+  .toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; transition: left 160ms; }
+  .toggle.on::after { left: 29px; }
+  .soundgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 4px; }
+  @media (min-width: 620px) { .soundgrid { grid-template-columns: repeat(3, 1fr); } }
+  .snd { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 13px 15px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.12); color: var(--silver); font-size: clamp(13px, 1.7vw, 17px); font-weight: 600; cursor: pointer; }
+  .snd:active { transform: scale(0.97); }
+  .snd.sel { background: var(--cyan); border-color: var(--cyan); color: #02121f; box-shadow: 0 0 14px var(--cyan-glow); }
+  .snd .pl { opacity: 0.55; margin-right: 7px; }
+  .snd.sel .pl { opacity: 0.9; }
+  .snd .ck { opacity: 0; font-weight: 800; }
+  .snd.sel .ck { opacity: 1; }
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: rgba(41,227,255,0.95); color: #02121f; padding: 12px 22px; border-radius: 999px; font-weight: 800; z-index: 100; opacity: 0; transition: opacity 200ms; pointer-events: none; }
+  .toast.show { opacity: 1; }
 </style>
 </head>
 <body>
-  <div class="tag">Fortune Poker</div>
-  <h1>High <span class="gold">Hand</span> Clock</h1>
-  <p class="note">🚧 Scaffold in place — app coming soon. Design locked: fixed-interval drawing, TV display + synced operator control panel.</p>
+
+<!-- ============ CLOCK (TV) VIEW ============ -->
+<div id="display">
+  <div class="top">
+    <div class="left">
+      <img class="logo" src="fortune-casino-logo.png" alt="Fortune Casino">
+      <div class="banner">
+        <div class="prize" id="bannerPrize">$100 – $250 HIGH HAND</div>
+        <div class="freq" id="bannerFreq">Every 30 Minutes</div>
+        <div class="tableTag empty" id="bannerTable">[—]</div>
+      </div>
+    </div>
+    <div class="clock tnum" id="clock">30:00</div>
+  </div>
+
+  <div class="cards" id="cardRow"><!-- cards injected --></div>
+  <div class="winner-flash hidden" id="winnerFlash">WINNER</div>
+
+  <div class="controls" id="controls">
+    <button class="ctl primary" id="btnNew"><span class="ic">＋</span>Enter Hand</button>
+    <button class="ctl" id="btnHistory"><span class="ic">🕘</span>History</button>
+    <button class="ctl" id="btnSettings"><span class="ic">⚙</span></button>
+    <button class="ctl" id="btnFs"><span class="ic">⛶</span></button>
+  </div>
+</div>
+
+<!-- ============ ENTER HAND VIEW ============ -->
+<div class="overlay hidden" id="entry">
+  <div class="ov-head">
+    <div class="ov-title">Enter High Hand<small>Pick a table, then tap exactly 5 cards</small></div>
+    <button class="btn ghost" id="entryClose">✕</button>
+  </div>
+  <div class="field-label">Table Number</div>
+  <div class="tables" id="tablePick"></div>
+  <div class="field-label">High Hand — Select 5 Cards</div>
+  <div class="grid" id="cardGrid"></div>
+  <div class="sel-summary">
+    <span class="sel-count" id="selCount">Selected: 0 / 5</span>
+    <span class="chips" id="selChips"></span>
+  </div>
+  <div class="ov-actions">
+    <button class="btn ghost" id="entryCancel">Cancel</button>
+    <button class="btn danger" id="entryClear">Clear</button>
+    <button class="btn primary" id="entrySubmit" disabled>Submit</button>
+  </div>
+</div>
+
+<!-- ============ HISTORY VIEW ============ -->
+<div class="overlay hidden" id="history">
+  <div class="ov-head">
+    <div class="ov-title">High Hand Log<small id="histSub">Past winners</small></div>
+    <button class="btn ghost" id="histClose">✕</button>
+  </div>
+  <div class="hist-list" id="histList"></div>
+  <div class="ov-actions">
+    <button class="btn danger" id="histClear">Clear Log</button>
+  </div>
+</div>
+
+<!-- ============ SETTINGS VIEW ============ -->
+<div class="overlay hidden" id="settings">
+  <div class="ov-head">
+    <div class="ov-title">Settings</div>
+    <button class="btn ghost" id="setClose">✕</button>
+  </div>
+  <div class="set-row"><label>Prize text</label><input type="text" id="setPrize" maxlength="40"></div>
+  <div class="set-row"><label>Period length<span class="hint">Aligned to the clock — 30 = top &amp; bottom of the hour</span></label><input type="number" id="setInterval" min="1" max="60"></div>
+  <div class="set-row"><label>Number of tables</label><input type="number" id="setTables" min="1" max="40"></div>
+  <div class="set-row"><label>Sound / alarm</label><div class="toggle" id="setSound"></div></div>
+  <div class="field-label">End-of-period sound <span style="text-transform:none;color:var(--muted);font-weight:400;font-size:12px;">— tap to hear &amp; pick</span></div>
+  <div class="soundgrid" id="soundGrid"></div>
+  <div class="ov-actions">
+    <button class="btn danger" id="setClearHand">Clear current hand</button>
+    <button class="btn primary" id="setSave">Save</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+const SUITS = [
+  { k:'s', sym:'♠', red:false },
+  { k:'h', sym:'♥', red:true  },
+  { k:'d', sym:'♦', red:true  },
+  { k:'c', sym:'♣', red:false }
+];
+const SUIT_MAP = {}; SUITS.forEach(s => SUIT_MAP[s.k] = s);
+const STORAGE_KEY = 'hhclock_v2';
+const HOLD_MS = 10000;          // winner stays up 10s after the buzzer, then resets
+const WARN_AT_MS = 10000;       // last 10s: clock flashes red
+
+const DEFAULTS = {
+  settings: { prize: '$100 – $250 HIGH HAND', intervalMin: 30, tables: 15, soundOn: true, soundId: 'jackpot' },
+  currentHand: null,            // { table:Number, cards:[code,...] }
+  history: []                   // [{ table, cards, wonAt }]
+};
+let state = load();
+let award = null;               // transient: { startAt } during the 10s winner hold
+let lastBoundary = null;        // ms timestamp of the most recently handled :00/:30 edge
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      return {
+        settings: Object.assign({}, DEFAULTS.settings, s.settings),
+        currentHand: s.currentHand || null,
+        history: Array.isArray(s.history) ? s.history : []
+      };
+    }
+  } catch (e) {}
+  return JSON.parse(JSON.stringify(DEFAULTS));
+}
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+const intervalMs = () => state.settings.intervalMin * 60000;
+
+/* ---------- wall-clock periods ----------
+   The countdown is derived from the real time of day and aligned to the hour,
+   so a 30-minute period always lands on :00 and :30. */
+function boundaries(now) {
+  const d = new Date(now);
+  const hourStart = now - ((d.getMinutes() * 60 + d.getSeconds()) * 1000 + d.getMilliseconds());
+  const step = intervalMs();
+  const msSinceHour = now - hourStart;
+  const prevTs = hourStart + Math.floor(msSinceHour / step) * step; // edge at/just before now
+  const nextTs = prevTs + step;                                     // next award time
+  return { prevTs, nextTs, remaining: nextTs - now };
+}
+
+/* ---------- audio engine (loud master bus + iOS keepalive) ---------- */
+let actx = null, masterBus = null, masterGain = null, keepAliveOsc = null;
+function initAudio() {
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    if (actx) {
+      // master bus: compressor → big make-up gain → destination, so the cue
+      // stays loud across the room even when mirrored to a TV through a caster
+      const comp = actx.createDynamicsCompressor();
+      comp.threshold.value = -28; comp.knee.value = 3; comp.ratio.value = 20;
+      comp.attack.value = 0.002; comp.release.value = 0.1;
+      masterGain = actx.createGain(); masterGain.gain.value = 10.0;   // ~+20 dB
+      comp.connect(masterGain); masterGain.connect(actx.destination);
+      masterBus = comp;
+      // silent keepalive so iOS Safari never suspends the context between periods
+      try {
+        keepAliveOsc = actx.createOscillator();
+        const sg = actx.createGain(); sg.gain.value = 0.0001;
+        keepAliveOsc.connect(sg); sg.connect(actx.destination);
+        keepAliveOsc.frequency.value = 1; keepAliveOsc.start();
+      } catch (e) {}
+    }
+  }
+  if (actx && actx.state === 'suspended' && actx.resume) actx.resume();
+}
+// one tone with optional pitch sweep (freqEnd); per-tone gain is modest, masterGain does the loudness
+function tone(freq, type, start, dur, gain, freqEnd) {
+  if (!actx) return;
+  const t0 = actx.currentTime + start;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.connect(g); g.connect(masterBus || actx.destination);
+  o.type = type;
+  if (freqEnd != null) { o.frequency.setValueAtTime(freq, t0); o.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), t0 + dur); }
+  else { o.frequency.value = freq; }
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(Math.min(0.95, gain * 1.6), t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.start(t0); o.stop(t0 + dur + 0.04);
+}
+// 10 loud, ~1–2s one-shot cues — a mix of celebratory wins and plain alerts
+const SOUNDS = [
+  { id:'jackpot',      label:'Jackpot Bells', fn:() => { tone(784,'triangle',0,0.16,0.6); tone(1047,'triangle',0.16,0.16,0.6); tone(1319,'triangle',0.32,0.16,0.6); tone(1568,'triangle',0.5,1.0,0.7); tone(2349,'sine',0.5,1.0,0.22); } },
+  { id:'coin_cascade', label:'Coin Cascade',  fn:() => { for (let j=0;j<3;j++) [1568,1319,1047,1319,1568].forEach((f,i)=>tone(f,'square', j*0.45+i*0.06, 0.09, 0.5)); } },
+  { id:'win_chime',    label:'Win Chime',     fn:() => { [523,659,784,1047,1319].forEach((f,i)=>tone(f,'sine', i*0.13, 0.5, 0.5)); tone(1319,'sine',0.6,0.9,0.45); tone(1047,'sine',0.6,0.9,0.4); } },
+  { id:'lucky_jingle', label:'Lucky Jingle',  fn:() => { [784,1047,1319,1047,1319].forEach((f,i)=>tone(f,'square', i*0.16, 0.16, 0.5)); tone(1568,'square',0.8,0.7,0.55); } },
+  { id:'royal_horn',   label:'Royal Horn',    fn:() => { tone(440,'sawtooth',0,0.24,0.5); tone(587,'sawtooth',0.22,0.24,0.5); tone(880,'sawtooth',0.44,1.0,0.55); tone(660,'sawtooth',0.44,1.0,0.3); tone(1100,'sawtooth',0.44,1.0,0.18); } },
+  { id:'double_beep',  label:'Alert Beeps',   fn:() => { for (let i=0;i<5;i++) tone(1175,'square', i*0.28, 0.16, 0.6); } },
+  { id:'power_buzz',   label:'Power Buzz',    fn:() => { for (let i=0;i<6;i++) { tone(150,'square', i*0.22, 0.17, 0.6); tone(75,'square', i*0.22, 0.17, 0.35); } } },
+  { id:'air_horn',     label:'Air Horn',      fn:() => { [0,0.78].forEach(s => { tone(233,'sawtooth',s,0.62,0.55); tone(349,'sawtooth',s,0.62,0.4); tone(466,'sawtooth',s,0.62,0.25); }); } },
+  { id:'ding_dong',    label:'Ding-Dong',     fn:() => { tone(988,'sine',0,0.32,0.6); tone(784,'sine',0.34,0.55,0.6); tone(988,'sine',0.9,0.32,0.6); tone(784,'sine',1.24,0.6,0.6); } },
+  { id:'laser_zap',    label:'Laser Zap',     fn:() => { for (let i=0;i<3;i++) tone(1800,'sawtooth', i*0.45, 0.4, 0.55, 180); } },
+];
+function playSound(id) { initAudio(); if (!actx) return; (SOUNDS.find(s => s.id === id) || SOUNDS[0]).fn(); }
+function playAlarm() { if (!state.settings.soundOn) return; playSound(state.settings.soundId); }
+function playChime() { if (!state.settings.soundOn) return; initAudio(); if (!actx) return; tone(660,'sine',0,0.1,0.3); tone(880,'sine',0.1,0.14,0.3); }
+
+/* ---------- view switching ---------- */
+const views = { entry: el('entry'), history: el('history'), settings: el('settings') };
+function el(id) { return document.getElementById(id); }
+function showOverlay(name) {
+  Object.keys(views).forEach(k => views[k].classList.toggle('hidden', k !== name));
+  if (name === 'entry') buildEntry();
+  if (name === 'history') buildHistory();
+  if (name === 'settings') buildSettings();
+}
+function closeOverlays() { Object.values(views).forEach(v => v.classList.add('hidden')); }
+
+/* ---------- clock display ---------- */
+function fmtClock(ms) {
+  if (ms < 0) ms = 0;
+  const total = Math.round(ms / 1000);
+  const m = Math.floor(total / 60), s = total % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+function cardFace(code) {
+  const rank = code.slice(0, -1), suit = SUIT_MAP[code.slice(-1)];
+  return '<div class="card"><div class="card-face ' + (suit.red ? 'red' : '') + '">'
+    + '<div class="rank">' + rank + '</div><div class="suit">' + suit.sym + '</div></div></div>';
+}
+function cardBack() {
+  return '<div class="card"><div class="card-back">'
+    + '<svg viewBox="0 0 120 92" xmlns="http://www.w3.org/2000/svg">'
+    + '<path d="M8 78 L20 30 L44 56 L60 20 L76 56 L100 30 L112 78 Z" fill="#eaf3ff"/>'
+    + '<rect x="10" y="74" width="100" height="14" rx="4" fill="#eaf3ff"/>'
+    + '<circle cx="20" cy="26" r="7" fill="#29e3ff"/><circle cx="60" cy="15" r="7" fill="#29e3ff"/><circle cx="100" cy="26" r="7" fill="#29e3ff"/>'
+    + '</svg></div></div>';
+}
+function renderCards() {
+  const hand = state.currentHand;
+  let html = '';
+  if (hand && hand.cards && hand.cards.length === 5) html = hand.cards.map(cardFace).join('');
+  else for (let i = 0; i < 5; i++) html += cardBack();
+  el('cardRow').innerHTML = html;
+}
+
+function renderDisplay() {
+  el('bannerPrize').textContent = state.settings.prize;
+  el('bannerFreq').textContent = 'Every ' + state.settings.intervalMin + ' Minute' + (state.settings.intervalMin === 1 ? '' : 's');
+
+  const tag = el('bannerTable');
+  if (state.currentHand && state.currentHand.table != null) { tag.textContent = '[ Table ' + state.currentHand.table + ' ]'; tag.classList.remove('empty'); }
+  else { tag.classList.add('empty'); }
+
+  const rem = award ? 0 : boundaries(Date.now()).remaining;
+  el('clock').textContent = fmtClock(rem);
+  el('clock').classList.toggle('warn', !award && rem > 0 && rem <= WARN_AT_MS);
+
+  el('winnerFlash').classList.toggle('hidden', !(award && state.currentHand));
+
+  renderCards();
+}
+
+/* ---------- the clock engine ---------- */
+function tick() {
+  const now = Date.now();
+  if (award) {
+    if (now - award.startAt >= HOLD_MS) endAward();
+    renderDisplay();
+    return;
+  }
+  const b = boundaries(now);
+  if (b.prevTs !== lastBoundary) {   // a :00/:30 edge just passed
+    lastBoundary = b.prevTs;
+    onWindowEnd();
+  }
+  renderDisplay();
+}
+function onWindowEnd() {
+  if (state.currentHand) {
+    state.history.unshift({ table: state.currentHand.table, cards: state.currentHand.cards.slice(), wonAt: Date.now() });
+    if (state.history.length > 200) state.history.length = 200;
+    award = { startAt: Date.now() };   // hold the winner up for 10s
+    playAlarm();
+    save();
+  } else {
+    playChime();                        // nobody had a qualifying hand this period
+  }
+}
+function endAward() {
+  award = null;
+  state.currentHand = null;             // clear to face-down for the new period
+  save();
+}
+function clearHand() {
+  award = null;
+  state.currentHand = null;
+  save(); renderDisplay(); toast('Current hand cleared');
+}
+
+/* ---------- Enter Hand view ---------- */
+let pick = { table: null, cards: [] };
+function buildEntry() {
+  pick = { table: null, cards: [] };
+  let th = '';
+  for (let i = 1; i <= state.settings.tables; i++) th += '<button class="tbl" data-t="' + i + '">' + i + '</button>';
+  el('tablePick').innerHTML = th;
+  let gh = '';
+  SUITS.forEach(su => {
+    RANKS.forEach(r => {
+      const code = r + su.k;
+      gh += '<button class="pcard ' + (su.red ? 'red' : '') + '" data-c="' + code + '"><span class="pr">' + r + '</span><span class="ps">' + su.sym + '</span></button>';
+    });
+  });
+  el('cardGrid').innerHTML = gh;
+  refreshEntry();
+}
+function refreshEntry() {
+  document.querySelectorAll('#tablePick .tbl').forEach(b => b.classList.toggle('sel', Number(b.dataset.t) === pick.table));
+  const full = pick.cards.length >= 5;
+  document.querySelectorAll('#cardGrid .pcard').forEach(b => {
+    const sel = pick.cards.includes(b.dataset.c);
+    b.classList.toggle('sel', sel);
+    b.classList.toggle('dim', full && !sel);
+  });
+  const cnt = el('selCount');
+  cnt.textContent = 'Selected: ' + pick.cards.length + ' / 5';
+  cnt.classList.toggle('done', pick.cards.length === 5);
+  el('selChips').innerHTML = pick.cards.map(c => {
+    const su = SUIT_MAP[c.slice(-1)];
+    return '<span class="chip ' + (su.red ? 'red' : '') + '">' + c.slice(0, -1) + su.sym + '</span>';
+  }).join('');
+  el('entrySubmit').disabled = !(pick.table != null && pick.cards.length === 5);
+}
+function submitHand() {
+  if (pick.table == null) { toast('Pick a table first'); return; }
+  if (pick.cards.length !== 5) { toast('Select exactly 5 cards'); return; }
+  award = null;
+  state.currentHand = { table: pick.table, cards: pick.cards.slice() };
+  save(); closeOverlays(); renderDisplay();
+  toast('High hand updated — Table ' + state.currentHand.table);
+}
+
+/* ---------- History view ---------- */
+function buildHistory() {
+  el('histSub').textContent = state.history.length ? state.history.length + ' recorded' : 'Past winners';
+  if (!state.history.length) { el('histList').innerHTML = '<div class="hist-empty">No high hands recorded yet.</div>'; return; }
+  el('histList').innerHTML = state.history.map(h => {
+    const cards = h.cards.map(c => { const su = SUIT_MAP[c.slice(-1)]; return '<span class="mini ' + (su.red ? 'red' : '') + '">' + c.slice(0, -1) + su.sym + '</span>'; }).join('');
+    const ws = new Date(h.wonAt).toLocaleString([], { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    return '<div class="hist-row"><span class="hist-when">' + ws + '</span><span class="hist-table">Table ' + h.table + '</span><span class="hist-cards">' + cards + '</span></div>';
+  }).join('');
+}
+
+/* ---------- Settings view ---------- */
+function buildSettings() {
+  el('setPrize').value = state.settings.prize;
+  el('setInterval').value = state.settings.intervalMin;
+  el('setTables').value = state.settings.tables;
+  el('setSound').classList.toggle('on', state.settings.soundOn);
+  el('soundGrid').innerHTML = SOUNDS.map(s =>
+    '<button class="snd' + (s.id === state.settings.soundId ? ' sel' : '') + '" data-s="' + s.id + '">'
+    + '<span><span class="pl">♪</span>' + s.label + '</span><span class="ck">✓</span></button>'
+  ).join('');
+}
+function saveSettings() {
+  state.settings.prize = el('setPrize').value.trim() || DEFAULTS.settings.prize;
+  state.settings.intervalMin = Math.max(1, Math.min(60, parseInt(el('setInterval').value) || 30));
+  state.settings.tables = Math.max(1, Math.min(40, parseInt(el('setTables').value) || 15));
+  state.settings.soundOn = el('setSound').classList.contains('on');
+  lastBoundary = boundaries(Date.now()).prevTs;   // realign after an interval change
+  save(); closeOverlays(); renderDisplay(); toast('Settings saved');
+}
+
+/* ---------- wake lock (keep tablet awake) ---------- */
+let wakeLock = null;
+async function requestWake() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') requestWake(); });
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg) { const t = el('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200); }
+
+/* ---------- fullscreen ---------- */
+function toggleFs() {
+  if (!document.fullscreenElement) { (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen).call(document.documentElement); }
+  else { (document.exitFullscreen || document.webkitExitFullscreen).call(document); }
+}
+
+/* ---------- wire up ---------- */
+el('btnNew').onclick = () => { initAudio(); showOverlay('entry'); };
+el('btnHistory').onclick = () => showOverlay('history');
+el('btnSettings').onclick = () => showOverlay('settings');
+el('btnFs').onclick = toggleFs;
+
+el('entryClose').onclick = el('entryCancel').onclick = closeOverlays;
+el('entryClear').onclick = () => { pick.cards = []; refreshEntry(); };
+el('entrySubmit').onclick = submitHand;
+el('tablePick').onclick = (e) => { const b = e.target.closest('.tbl'); if (!b) return; pick.table = Number(b.dataset.t); refreshEntry(); };
+el('cardGrid').onclick = (e) => {
+  const b = e.target.closest('.pcard'); if (!b) return;
+  const code = b.dataset.c, i = pick.cards.indexOf(code);
+  if (i >= 0) pick.cards.splice(i, 1);
+  else if (pick.cards.length < 5) pick.cards.push(code);
+  else toast('Already 5 cards — deselect one first');
+  refreshEntry();
+};
+
+el('histClose').onclick = closeOverlays;
+el('histClear').onclick = () => { if (confirm('Clear the entire high hand log?')) { state.history = []; save(); buildHistory(); } };
+
+el('setClose').onclick = closeOverlays;
+el('setSound').onclick = () => { const on = !el('setSound').classList.contains('on'); el('setSound').classList.toggle('on', on); state.settings.soundOn = on; save(); };
+el('soundGrid').onclick = (e) => {
+  const b = e.target.closest('.snd'); if (!b) return;
+  state.settings.soundId = b.dataset.s; save();
+  document.querySelectorAll('#soundGrid .snd').forEach(x => x.classList.toggle('sel', x === b));
+  playSound(b.dataset.s);   // preview (always plays on an explicit tap)
+};
+el('setClearHand').onclick = () => { if (confirm('Clear the current high hand and show face-down cards?')) { clearHand(); closeOverlays(); } };
+el('setSave').onclick = saveSettings;
+
+// reveal control bar briefly on any tap of the display
+el('display').addEventListener('pointerdown', () => { const c = el('controls'); c.classList.add('show'); clearTimeout(window._cBar); window._cBar = setTimeout(() => c.classList.remove('show'), 4000); });
+
+// first gesture primes audio
+document.addEventListener('pointerdown', function prime() { initAudio(); document.removeEventListener('pointerdown', prime); }, { once: true });
+
+// boot
+lastBoundary = boundaries(Date.now()).prevTs;   // don't fire for an already-passed edge on load
+// optional preview (does not persist): add ?demo to the URL to show a sample hand
+if (location.search.indexOf('demo') >= 0 && !state.currentHand) state.currentHand = { table: 13, cards: ['4s','4h','4d','Kd','Kc'] };
+requestWake();
+renderDisplay();
+setInterval(tick, 250);
+</script>
 </body>
 </html>
