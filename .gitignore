@@ -1,0 +1,27 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node (if we add a build later)
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.log
+npm-debug.log*
+
+# Misc
+.cache/
+
+# Stray screenshots saved into the project folder — not part of the app
+Screenshot*.png
+Screenshot*.jpg
+
+# Vercel
+.vercel
