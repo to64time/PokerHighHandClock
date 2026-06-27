@@ -301,6 +301,8 @@ const SUIT_MAP = {}; SUITS.forEach(s => SUIT_MAP[s.k] = s);
 const STORAGE_KEY = 'hhclock_v2';
 const HOLD_MS = 10000;          // winner stays up 10s after the buzzer, then resets
 const WARN_AT_MS = 10000;       // last 10s: clock flashes red
+const LATE_GRACE_MS = 3000;     // only buzz if the :00/:30 edge JUST happened — prevents a stale
+                                // beep firing late when the screen was asleep/backgrounded across it
 
 const DEFAULTS = {
   settings: { prize: '$100 – $250 HIGH HAND', intervalMin: 30, tables: 15, soundOn: true, soundId: 'jackpot', note: 'Daily 11AM – 7PM' },
@@ -479,9 +481,21 @@ function tick() {
     return;
   }
   const b = boundaries(now);
-  if (b.prevTs !== lastBoundary) {   // a :00/:30 edge just passed
+  if (b.prevTs !== lastBoundary) {   // a :00/:30 edge passed
     lastBoundary = b.prevTs;
-    onWindowEnd();
+    if (now - b.prevTs <= LATE_GRACE_MS) {
+      onWindowEnd();                 // the edge genuinely just happened → buzzer + winner hold / chime
+    } else {
+      // the tab was asleep (screen off / backgrounded) across the edge — finalize
+      // silently so we don't beep ~30s late into the new period
+      if (state.currentHand) {
+        state.history.unshift({ table: state.currentHand.table, cards: state.currentHand.cards.slice(), wonAt: b.prevTs });
+        if (state.history.length > 200) state.history.length = 200;
+        state.currentHand = null;
+      }
+      award = null;
+      save();
+    }
   }
   renderDisplay();
 }
